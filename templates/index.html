@@ -13,17 +13,23 @@
     <section class="hero">
       <div>
         <p class="eyebrow">Carrito IoT</p>
-        <h1>Control y monitoreo en tiempo real</h1>
+        <h1>Control remoto del carrito</h1>
       </div>
 
-      <div class="status-strip">
-        <div class="status-pill" id="apiStatus">
-          <span class="dot dot-warn"></span>
-          API pendiente
-        </div>
-        <div class="status-pill" id="wsStatus">
-          <span class="dot dot-warn"></span>
-          WebSocket pendiente
+      <div class="hero-actions">
+        <nav class="page-nav" aria-label="Secciones">
+          <a class="page-nav-link active" href="{{ url_for('index') }}">Control</a>
+          <a class="page-nav-link" href="{{ url_for('monitoreo') }}">Monitoreo</a>
+        </nav>
+        <div class="status-strip">
+          <div class="status-pill" id="apiStatus">
+            <span class="dot dot-warn"></span>
+            API pendiente
+          </div>
+          <div class="status-pill" id="wsStatus">
+            <span class="dot dot-warn"></span>
+            WebSocket pendiente
+          </div>
         </div>
       </div>
     </section>
@@ -32,29 +38,53 @@
       <div>
         <p class="eyebrow">Alerta de seguridad</p>
         <h2>Obstaculo detectado</h2>
-        <p id="obstacleMessage">El carro fue detenido. Recalibra la ruta para volver a usar el joystick.</p>
+        <p id="obstacleMessage">El carro fue detenido. El sistema esta buscando una ruta libre automaticamente.</p>
       </div>
-      <button class="primary-button" id="recalibrateButton">Recalibrar ruta</button>
     </section>
 
-    <section class="dashboard">
+    <section class="dashboard control-dashboard">
       <article class="panel cockpit-panel">
         <div class="panel-header">
           <div>
             <p class="eyebrow">Movimiento</p>
-            <h2>Joystick</h2>
+            <h2>Control manual</h2>
           </div>
           <button class="icon-button danger" id="stopButton" title="Detener">STOP</button>
         </div>
 
-        <div class="joystick-zone">
-          <div class="joystick-label top">Adelante</div>
-          <div class="joystick-label bottom">Atras</div>
-          <div class="joystick-label left">Izq</div>
-          <div class="joystick-label right">Der</div>
-          <div class="joystick" id="joystick">
-            <div class="joystick-rings"></div>
-            <div class="joystick-knob" id="joystickKnob"></div>
+        <div class="control-switch" role="tablist" aria-label="Modo de control">
+          <button class="control-switch-button active" data-control-mode="joystick" role="tab" aria-selected="true">Joystick</button>
+          <button class="control-switch-button" data-control-mode="dpad" role="tab" aria-selected="false">Cruceta</button>
+        </div>
+
+        <div class="control-mode" id="joystickControl">
+          <div class="joystick-zone">
+            <div class="joystick-label top">Adelante</div>
+            <div class="joystick-label bottom">Atras</div>
+            <div class="joystick-label left">Izq</div>
+            <div class="joystick-label right">Der</div>
+            <div class="joystick" id="joystick">
+              <div class="joystick-rings"></div>
+              <div class="joystick-knob" id="joystickKnob"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="control-mode" id="dpadControl" hidden>
+          <div class="dpad-grid" aria-label="Cruceta de movimientos">
+            <button class="dpad-button diagonal" data-move="vuelta_adelante_izquierda" title="Vuelta adelante izquierda">↖</button>
+            <button class="dpad-button" data-move="adelante" title="Adelante">↑</button>
+            <button class="dpad-button diagonal" data-move="vuelta_adelante_derecha" title="Vuelta adelante derecha">↗</button>
+            <button class="dpad-button" data-move="giro_90_izquierda" title="Giro 90 izquierda">↶</button>
+            <button class="dpad-button stop" data-move="alto" title="Parada">STOP</button>
+            <button class="dpad-button" data-move="giro_90_derecha" title="Giro 90 derecha">↷</button>
+            <button class="dpad-button diagonal" data-move="vuelta_atras_izquierda" title="Vuelta atras izquierda">↙</button>
+            <button class="dpad-button" data-move="atras" title="Atras">↓</button>
+            <button class="dpad-button diagonal" data-move="vuelta_atras_derecha" title="Vuelta atras derecha">↘</button>
+          </div>
+          <div class="spin-grid dpad-spin-grid">
+            <button class="secondary-button" data-move="giro_360_izquierda">Giro 360 izq</button>
+            <button class="secondary-button" data-move="giro_360_derecha">Giro 360 der</button>
           </div>
         </div>
 
@@ -63,47 +93,11 @@
           <strong id="currentCommand">Reposo</strong>
         </div>
 
-        <div class="spin-grid">
+        <div class="spin-grid" id="joystickSpinGrid">
           <button class="secondary-button" data-move="giro_90_izquierda">Giro 90 izq</button>
           <button class="secondary-button" data-move="giro_90_derecha">Giro 90 der</button>
           <button class="secondary-button" data-move="giro_360_izquierda">Giro 360 izq</button>
           <button class="secondary-button" data-move="giro_360_derecha">Giro 360 der</button>
-        </div>
-      </article>
-
-      <article class="panel status-panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Telemetria</p>
-            <h2>Estado actual</h2>
-          </div>
-          <button class="icon-button" id="refreshButton" title="Actualizar">REF</button>
-        </div>
-
-        <div class="metric-grid">
-          <div class="metric">
-            <span>Ultimo movimiento</span>
-            <strong id="lastMovement">Sin datos</strong>
-          </div>
-          <div class="metric metric-distance">
-            <span>Distancia</span>
-            <strong id="distanceValue">-- cm</strong>
-          </div>
-          <div class="metric">
-            <span>Ultimo evento</span>
-            <strong id="lastEvent">Sin eventos</strong>
-          </div>
-          <div class="metric">
-            <span>Actualizacion</span>
-            <strong id="lastUpdate">--:--:--</strong>
-          </div>
-        </div>
-
-        <div class="history-block">
-          <div class="subheader">
-            <h3>Ultimos 5 estatus</h3>
-          </div>
-          <div class="compact-list" id="statusHistory"></div>
         </div>
       </article>
 
@@ -177,24 +171,22 @@
         <div class="demo-actions">
           <input id="demoName" class="form-control form-control-sm" value="Demo carrito" aria-label="Nombre demo">
           <button class="primary-button" id="saveDemoButton">Registrar</button>
+        </div>
+
+        <div class="selected-demo">
+          <span>Demo seleccionada</span>
+          <strong id="selectedDemoName">Ninguna</strong>
+        </div>
+
+        <div class="demo-command-actions">
+          <button class="primary-button" id="executeDemoButton" disabled>Ejecutar</button>
           <button class="secondary-button" id="repeatDemoButton" disabled>Repetir</button>
+          <button class="secondary-button delete-button" id="deleteDemoButton" disabled>Eliminar</button>
         </div>
 
         <div class="compact-list demos-list" id="demosList"></div>
       </article>
 
-      <article class="panel log-panel">
-        <div class="panel-header">
-          <div>
-            <p class="eyebrow">Monitoreo</p>
-            <h2>Obstaculos y bitacora</h2>
-          </div>
-          <button class="icon-button" id="clearLogButton" title="Limpiar bitacora">CLR</button>
-        </div>
-
-        <div class="compact-list obstacle-list" id="obstacleHistory"></div>
-        <div class="log" id="log"></div>
-      </article>
     </section>
   </main>
 

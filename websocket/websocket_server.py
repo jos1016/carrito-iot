@@ -43,18 +43,6 @@ class WebSocketServer:
                 WebSocketServer.quitar_cliente(cliente)
 
     @staticmethod
-    def enviar_recalibracion(duracion=1000):
-        mensaje = json.dumps({
-            "tipo": "recalibrar",
-            "duracion_ms": duracion
-        })
-
-        print("RECALIBRACION ENVIADA A CLIENTES")
-        print(f"Duracion: {duracion} ms")
-
-        WebSocketServer.broadcast(mensaje)
-
-    @staticmethod
     def websocket_handshake(cliente):
 
         request = cliente.recv(1024).decode()
@@ -162,12 +150,13 @@ class WebSocketServer:
                 try:
 
                     data_json = json.loads(mensaje)
+                    tipo = data_json.get("tipo")
 
                     # ==================================
                     # OBSTACULO
                     # ==================================
 
-                    if data_json["tipo"] == "obstaculo":
+                    if tipo == "obstaculo":
 
                         distancia = data_json["distancia"]
 
@@ -188,36 +177,29 @@ class WebSocketServer:
 
                         continue
 
-                    if data_json["tipo"] == "recalibrar":
+                    if tipo == "distancia":
 
-                        duracion = data_json.get("duracion_ms", 1000)
-
-                        print("RECALIBRACION SOLICITADA")
-                        print(f"Duracion: {duracion} ms")
+                        distancia = data_json.get("distancia")
 
                         response = json.dumps({
-                            "tipo": "recalibrar",
-                            "duracion_ms": duracion
+                            "evento": "distancia",
+                            "distancia": distancia
                         })
 
                         WebSocketServer.broadcast(response, excluir=cliente)
-                        WebSocketServer.enviar(cliente, json.dumps({
-                            "evento": "recalibracion_enviada",
-                            "duracion_ms": duracion
-                        }))
 
                         continue
 
-                    if data_json["tipo"] == "recalibracion":
+                    if tipo == "autonomia":
 
-                        estado = data_json.get("estado", "desconocido")
+                        estado = data_json.get("estado", "buscando")
                         distancia = data_json.get("distancia")
 
-                        print("RECALIBRACION REPORTADA")
+                        print("AUTONOMIA REPORTADA")
                         print(f"Estado: {estado}")
 
                         response = json.dumps({
-                            "evento": "recalibracion",
+                            "evento": "autonomia",
                             "estado": estado,
                             "distancia": distancia
                         })

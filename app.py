@@ -5,7 +5,6 @@ from controllers.movimiento_controller import MovimientoController
 from controllers.parametro_controller import ParametroController
 from controllers.demo_controller import DemoController
 from controllers.estatus_controller import EstatusController
-from controllers.recalibracion_controller import RecalibracionController
 from websocket.websocket_server import WebSocketServer
 
 
@@ -15,6 +14,11 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/monitoreo')
+def monitoreo():
+    return render_template('monitoreo.html')
 
 
 @app.route('/api/movimiento', methods=['POST'])
@@ -32,11 +36,6 @@ def ultimos_estatus():
     return EstatusController.ultimos_estatus()
 
 
-@app.route('/api/recalibrar', methods=['POST'])
-def recalibrar():
-    return RecalibracionController.recalibrar()
-
-
 @app.route('/api/demos', methods=['GET'])
 def listar_demos():
     return DemoController.listar_demos()
@@ -50,6 +49,16 @@ def crear_demo():
 @app.route('/api/demos/<int:id_demo>', methods=['GET'])
 def visualizar_demo(id_demo):
     return DemoController.visualizar_demo(id_demo)
+
+
+@app.route('/api/demos/<int:id_demo>', methods=['DELETE'])
+def eliminar_demo(id_demo):
+    return DemoController.eliminar_demo(id_demo)
+
+
+@app.route('/api/demos/<int:id_demo>/ejecutar', methods=['POST'])
+def ejecutar_demo(id_demo):
+    return DemoController.ejecutar_demo(id_demo)
 
 
 @app.route('/api/demos/<int:id_demo>/repetir', methods=['POST'])

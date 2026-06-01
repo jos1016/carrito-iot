@@ -63,6 +63,14 @@ class DemoController:
 
     @staticmethod
     def repetir_demo(id_demo):
+        return DemoController._ejecutar_demo(id_demo, "repitiendo")
+
+    @staticmethod
+    def ejecutar_demo(id_demo):
+        return DemoController._ejecutar_demo(id_demo, "ejecutando")
+
+    @staticmethod
+    def _ejecutar_demo(id_demo, estado):
         try:
             data = request.get_json(silent=True) or {}
             id_dispositivo = data.get('id_dispositivo', 1)
@@ -78,8 +86,24 @@ class DemoController:
                 "success": True,
                 "data": {
                     "id_demo": id_demo,
-                    "estado": "ejecutando"
+                    "estado": estado
                 }
+            }), 200
+
+        except Exception as e:
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
+
+    @staticmethod
+    def eliminar_demo(id_demo):
+        try:
+            resultado = DemoModel.eliminar_demo(id_demo)
+
+            return jsonify({
+                "success": True,
+                "data": resultado
             }), 200
 
         except Exception as e:

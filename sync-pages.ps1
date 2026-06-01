@@ -10,21 +10,32 @@ Copy-Item -LiteralPath (Join-Path $root "static\app.css") -Destination (Join-Pat
 Copy-Item -LiteralPath (Join-Path $root "static\app.js") -Destination (Join-Path $docsStatic "app.js") -Force
 Copy-Item -LiteralPath (Join-Path $root "static\favicon.svg") -Destination (Join-Path $docsStatic "favicon.svg") -Force
 
-$html = Get-Content -Raw -LiteralPath (Join-Path $root "templates\index.html")
-
-$html = $html.Replace("{{ url_for('static', filename='favicon.svg') }}", "./static/favicon.svg")
-$html = $html.Replace("{{ url_for('static', filename='app.css') }}", "./static/app.css")
-$html = $html.Replace("{{ url_for('static', filename='app.js') }}", "./static/app.js")
-
 $banner = @'
   <section class="pages-banner">
     Vista publica del proyecto. Para controlar el carrito, abre la aplicacion Flask dentro de la red local.
   </section>
 '@
 
-$html = $html.Replace('  <main class="shell">', "  <main class=`"shell`">`r`n$banner")
+function Convert-TemplateToPages {
+  param(
+    [string]$Template,
+    [string]$Destination
+  )
 
-Set-Content -LiteralPath (Join-Path $docs "index.html") -Value $html -Encoding UTF8
+  $html = Get-Content -Raw -LiteralPath (Join-Path $root "templates\$Template")
+
+  $html = $html.Replace("{{ url_for('static', filename='favicon.svg') }}", "./static/favicon.svg")
+  $html = $html.Replace("{{ url_for('static', filename='app.css') }}", "./static/app.css")
+  $html = $html.Replace("{{ url_for('static', filename='app.js') }}", "./static/app.js")
+  $html = $html.Replace("{{ url_for('index') }}", "./index.html")
+  $html = $html.Replace("{{ url_for('monitoreo') }}", "./monitoreo.html")
+  $html = $html.Replace('  <main class="shell">', "  <main class=`"shell`">`r`n$banner")
+
+  Set-Content -LiteralPath (Join-Path $docs $Destination) -Value $html -Encoding UTF8
+}
+
+Convert-TemplateToPages -Template "index.html" -Destination "index.html"
+Convert-TemplateToPages -Template "monitoreo.html" -Destination "monitoreo.html"
 
 $pagesCss = @'
 

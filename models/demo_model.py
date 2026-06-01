@@ -157,3 +157,42 @@ class DemoModel:
         conexion.commit()
         cursor.close()
         conexion.close()
+
+    @staticmethod
+    def eliminar_demo(id_demo):
+        conexion = Database.get_connection()
+        cursor = conexion.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            DELETE FROM log_demo_ejecuciones
+            WHERE id_demo = %s
+            """,
+            (
+                id_demo,
+            )
+        )
+
+        cursor.execute(
+            """
+            DELETE FROM demos
+            WHERE id_demo = %s
+            """,
+            (
+                id_demo,
+            )
+        )
+
+        eliminados = cursor.rowcount
+
+        conexion.commit()
+        cursor.close()
+        conexion.close()
+
+        if eliminados == 0:
+            raise ValueError("Demo no encontrado")
+
+        return {
+            "id_demo": id_demo,
+            "eliminado": True
+        }

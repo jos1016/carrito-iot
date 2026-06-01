@@ -46,9 +46,10 @@ const MOVEMENT_LABELS = {
 const state = {
   ws: null,
   reconnectTimer: null,
-  obstacleLocked: false,
+  controlMode: 'joystick',
   joystickActive: false,
   lastJoystickMove: null,
+  lastDistance: null,
   demoSequence: [],
   selectedDemoId: null
 };
@@ -64,6 +65,9 @@ const paramsForm = document.querySelector('#paramsForm');
 const joystickZone = document.querySelector('.joystick-zone');
 const joystick = document.querySelector('#joystick');
 const joystickKnob = document.querySelector('#joystickKnob');
+const joystickControl = document.querySelector('#joystickControl');
+const dpadControl = document.querySelector('#dpadControl');
+const joystickSpinGrid = document.querySelector('#joystickSpinGrid');
 const currentCommand = document.querySelector('#currentCommand');
 const obstacleAlert = document.querySelector('#obstacleAlert');
 const obstacleMessage = document.querySelector('#obstacleMessage');
@@ -74,18 +78,33 @@ const demoMoveSelect = document.querySelector('#demoMoveSelect');
 const demoSequence = document.querySelector('#demoSequence');
 const demosList = document.querySelector('#demosList');
 const demoName = document.querySelector('#demoName');
+const selectedDemoName = document.querySelector('#selectedDemoName');
+const executeDemoButton = document.querySelector('#executeDemoButton');
 const repeatDemoButton = document.querySelector('#repeatDemoButton');
+const deleteDemoButton = document.querySelector('#deleteDemoButton');
+const radar = document.querySelector('#radar');
+const radarBlip = document.querySelector('#radarBlip');
+const radarDistance = document.querySelector('#radarDistance');
+const radarState = document.querySelector('#radarState');
 
 function now() {
   return new Date().toLocaleTimeString();
 }
 
 function setPill(element, label, status) {
+  if (!element) {
+    return;
+  }
+
   const dotClass = status === 'ok' ? 'dot-ok' : status === 'bad' ? 'dot-bad' : 'dot-warn';
   element.innerHTML = `<span class="dot ${dotClass}"></span>${label}`;
 }
 
 function log(message) {
+  if (!logBox) {
+    return;
+  }
+
   const entry = document.createElement('div');
   entry.className = 'log-entry';
   entry.innerHTML = `<time>${now()}</time> ${message}`;
@@ -97,7 +116,9 @@ function log(message) {
 }
 
 function touch() {
-  lastUpdate.textContent = now();
+  if (lastUpdate) {
+    lastUpdate.textContent = now();
+  }
 }
 
 function formatDate(value) {
@@ -108,27 +129,11 @@ function formatDate(value) {
   return new Date(value).toLocaleTimeString();
 }
 
-function setControlsLocked(locked) {
-  state.obstacleLocked = locked;
-  joystickZone.classList.toggle('locked', locked);
-
-  document.querySelectorAll('[data-move]').forEach((button) => {
-    button.disabled = locked;
-  });
-
-  currentCommand.textContent = locked ? 'Bloqueado por obstaculo' : 'Reposo';
-}
-
 async function sendMovement(moveKey, options = {}) {
   const idMovimiento = MOVIMIENTOS[moveKey];
 
   if (!idMovimiento) {
     log(`Movimiento no configurado: ${moveKey}`);
-    return false;
-  }
-
-  if (state.obstacleLocked && moveKey !== 'alto' && !options.force) {
-    log('Joystick bloqueado por obstaculo. Recalibra la ruta para continuar.');
     return false;
   }
 
@@ -155,7 +160,9 @@ async function sendMovement(moveKey, options = {}) {
 
     const label = MOVEMENT_LABELS[moveKey] || moveKey;
     setPill(apiStatus, 'API conectada', 'ok');
-    lastMovement.textContent = label;
+    if (lastMovement) {
+      lastMovement.textContent = label;
+    }
 
     if (!options.silent) {
       log(`Movimiento enviado: ${label}`);
@@ -175,6 +182,10 @@ async function sendMovement(moveKey, options = {}) {
 async function saveParams(event) {
   if (event) {
     event.preventDefault();
+  }
+
+  if (!paramsForm) {
+    return;
   }
 
   const form = new FormData(paramsForm);
@@ -227,6 +238,10 @@ async function refreshStatus() {
 }
 
 function renderStatusHistory(items) {
+  if (!statusHistory) {
+    return;
+  }
+
   if (!items.length) {
     statusHistory.innerHTML = '<div class="list-row"><span>Sin registros</span></div>';
     return;
@@ -241,6 +256,10 @@ function renderStatusHistory(items) {
 }
 
 function renderObstacleHistory(items) {
+  if (!obstacleHistory) {
+    return;
+  }
+
   if (!items.length) {
     obstacleHistory.innerHTML = '<div class="list-row"><span>Sin obstaculos</span></div>';
     return;
@@ -255,6 +274,10 @@ function renderObstacleHistory(items) {
 }
 
 async function loadDemos() {
+  if (!demosList) {
+    return;
+  }
+
   try {
     const response = await fetch(`${API_BASE}/api/demos?limite=5`);
     const data = await response.json();
@@ -270,6 +293,10 @@ async function loadDemos() {
 }
 
 function renderDemos(items) {
+  if (!demosList) {
+    return;
+  }
+
   if (!items.length) {
     demosList.innerHTML = '<div class="list-row"><span>Sin demos guardadas</span></div>';
     return;
@@ -285,13 +312,36 @@ function renderDemos(items) {
   demosList.querySelectorAll('[data-demo-id]').forEach((button) => {
     button.addEventListener('click', () => {
       state.selectedDemoId = Number(button.dataset.demoId);
-      repeatDemoButton.disabled = false;
-      log(`Demo seleccionado: ${button.querySelector('strong').textContent}`);
+      const name = button.querySelector('strong').textContent;
+
+      demosList.querySelectorAll('[data-demo-id]').forEach((item) => {
+        item.classList.toggle('active', item === button);
+      });
+
+      setSelectedDemo(name);
+      log(`Demo seleccionado: ${name}`);
     });
   });
 }
 
+function setSelectedDemo(name = 'Ninguna') {
+  if (!selectedDemoName) {
+    return;
+  }
+
+  const selected = Boolean(state.selectedDemoId);
+
+  selectedDemoName.textContent = name;
+  executeDemoButton.disabled = !selected;
+  repeatDemoButton.disabled = !selected;
+  deleteDemoButton.disabled = !selected;
+}
+
 function renderDemoSequence() {
+  if (!demoSequence) {
+    return;
+  }
+
   if (!state.demoSequence.length) {
     demoSequence.innerHTML = '<span class="text-muted small">Agrega movimientos para registrar un demo.</span>';
     return;
@@ -341,7 +391,7 @@ async function saveDemo() {
 
     const saved = data.data?.[0];
     state.selectedDemoId = saved?.id_demo || null;
-    repeatDemoButton.disabled = !state.selectedDemoId;
+    setSelectedDemo(payload.nombre);
     state.demoSequence = [];
     renderDemoSequence();
     loadDemos();
@@ -351,14 +401,14 @@ async function saveDemo() {
   }
 }
 
-async function repeatSelectedDemo() {
+async function runSelectedDemo(action) {
   if (!state.selectedDemoId) {
     log('Selecciona o registra un demo primero.');
     return;
   }
 
   try {
-    const response = await fetch(`${API_BASE}/api/demos/${state.selectedDemoId}/repetir`, {
+    const response = await fetch(`${API_BASE}/api/demos/${state.selectedDemoId}/${action}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -371,11 +421,40 @@ async function repeatSelectedDemo() {
       throw new Error(data.error || `HTTP ${response.status}`);
     }
 
-    log('Demo enviado a repeticion.');
+    log(action === 'ejecutar' ? 'Demo enviado a ejecucion.' : 'Demo enviado a repeticion.');
     refreshStatus();
     requestLastMovement();
   } catch (error) {
-    log(`Error repitiendo demo: ${error.message}`);
+    log(`Error procesando demo: ${error.message}`);
+  }
+}
+
+async function deleteSelectedDemo() {
+  if (!state.selectedDemoId) {
+    log('Selecciona una demo primero.');
+    return;
+  }
+
+  if (!window.confirm(`Eliminar demo "${selectedDemoName.textContent}"?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/api/demos/${state.selectedDemoId}`, {
+      method: 'DELETE'
+    });
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || `HTTP ${response.status}`);
+    }
+
+    log('Demo eliminada.');
+    state.selectedDemoId = null;
+    setSelectedDemo();
+    loadDemos();
+  } catch (error) {
+    log(`Error eliminando demo: ${error.message}`);
   }
 }
 
@@ -432,8 +511,13 @@ function handleWebSocketMessage(raw) {
       return;
     }
 
-    if (data.evento === 'recalibracion') {
-      renderRecalibration(data);
+    if (data.evento === 'distancia') {
+      renderDistance(data.distancia);
+      return;
+    }
+
+    if (data.evento === 'autonomia') {
+      renderAutonomy(data);
       return;
     }
 
@@ -455,103 +539,146 @@ function renderMovement(data) {
   const izquierda = `${movimiento.mi_direccion || 'STOP'} ${movimiento.mi_velocidad || 0}`;
   const derecha = `${movimiento.md_direccion || 'STOP'} ${movimiento.md_velocidad || 0}`;
 
-  lastMovement.textContent = clave;
+  if (lastMovement) {
+    lastMovement.textContent = clave;
+  }
   log(`Ultimo movimiento: ${clave} | MI ${izquierda} | MD ${derecha}`);
   touch();
   refreshStatus();
+}
+
+function renderDistance(value) {
+  const distancia = Number(value);
+
+  if (!Number.isFinite(distancia) || distancia <= 0) {
+    return;
+  }
+
+  const texto = `${distancia.toFixed(1)} cm`;
+  const offset = Math.min(distancia, 100) * 0.7;
+  const obstacle = distancia <= 15;
+
+  state.lastDistance = distancia;
+
+  if (distanceValue) {
+    distanceValue.textContent = texto;
+  }
+
+  if (radarDistance) {
+    radarDistance.textContent = texto;
+  }
+
+  if (radar) {
+    radar.style.setProperty('--blip-offset', `${offset}%`);
+    radar.classList.toggle('danger', obstacle);
+  }
+
+  if (radarBlip) {
+    radarBlip.hidden = false;
+  }
+
+  if (radarState) {
+    radarState.textContent = obstacle ? 'Obstaculo en zona de frenado' : 'Ruta frontal disponible';
+  }
+
+  touch();
 }
 
 async function renderObstacle(data) {
   const distancia = Number(data.distancia);
   const distanciaTexto = Number.isFinite(distancia) ? `${distancia.toFixed(1)} cm` : '-- cm';
 
-  distanceValue.textContent = distanciaTexto;
-  lastEvent.textContent = 'Obstaculo';
-  obstacleMessage.textContent = `Obstaculo a ${distanciaTexto}. El carro fue detenido y el joystick queda bloqueado hasta recalibrar la ruta.`;
-  obstacleAlert.hidden = false;
-  setControlsLocked(true);
+  renderDistance(distancia);
+  if (lastEvent) {
+    lastEvent.textContent = 'Obstaculo';
+  }
+
+  if (obstacleMessage) {
+    obstacleMessage.textContent = `Obstaculo a ${distanciaTexto}. El carro se detuvo y esta buscando una ruta libre automaticamente.`;
+  }
+
+  if (obstacleAlert) {
+    obstacleAlert.hidden = false;
+  }
   resetJoystick();
 
   log(`Obstaculo detectado a ${distanciaTexto}`);
-  log('Frenado automatico enviado: PARADA');
+  log('Frenado automatico activado por el sensor.');
   touch();
-
-  await sendMovement('alto', {
-    force: true,
-    silent: true
-  });
   refreshStatus();
 }
 
-function renderRecalibration(data) {
+function renderAutonomy(data) {
   const distancia = Number(data.distancia);
   const distanciaTexto = Number.isFinite(distancia) ? `${distancia.toFixed(1)} cm` : '-- cm';
 
-  if (data.estado === 'libre') {
-    distanceValue.textContent = distanciaTexto;
-    obstacleAlert.hidden = true;
-    setControlsLocked(false);
+  if (Number.isFinite(distancia)) {
+    renderDistance(distancia);
+  }
+
+  if (data.estado === 'ruta_libre') {
+
+    if (obstacleAlert) {
+      obstacleAlert.hidden = true;
+    }
+
     resetJoystick();
-    lastEvent.textContent = 'Ruta libre';
-    log(`Ruta libre despues de recalibrar: ${distanciaTexto}`);
+
+    if (lastEvent) {
+      lastEvent.textContent = 'Ruta libre';
+    }
+
+    log(`Ruta libre encontrada: ${distanciaTexto}`);
     touch();
     return;
   }
 
-  lastEvent.textContent = 'Recalibracion incompleta';
-  obstacleMessage.textContent = `No se encontro ruta libre. Distancia actual: ${distanciaTexto}. Intenta recalibrar otra vez.`;
-  obstacleAlert.hidden = false;
-  setControlsLocked(true);
-  resetJoystick();
-  log(`Recalibracion incompleta. Distancia: ${distanciaTexto}`);
-  touch();
-}
-
-async function recalibrateRoute() {
-  obstacleAlert.hidden = false;
-  obstacleMessage.textContent = 'Buscando ruta libre. El carrito retrocedera y girara automaticamente.';
-  lastEvent.textContent = 'Recalibrando ruta';
-  resetJoystick();
-  setControlsLocked(true);
-  log('Recalibrando ruta: busqueda autonoma iniciada.');
-  touch();
-
-  if (state.ws && state.ws.readyState === WebSocket.OPEN) {
-    state.ws.send(JSON.stringify({
-      tipo: 'recalibrar',
-      duracion_ms: 1000
-    }));
-    log('Orden directa enviada por WebSocket.');
-  }
-
-  try {
-    const response = await fetch(`${API_BASE}/api/recalibrar`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        duracion_ms: 1000
-      })
-    });
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || `HTTP ${response.status}`);
+  if (data.estado === 'sin_ruta') {
+    if (lastEvent) {
+      lastEvent.textContent = 'Sin ruta libre';
     }
 
-    log('Orden de recalibracion enviada al carrito.');
-  } catch (error) {
-    log(`Error enviando recalibracion: ${error.message}`);
+    if (obstacleMessage) {
+      obstacleMessage.textContent = `No se encontro una ruta libre despues de revisar las cuatro direcciones. Distancia actual: ${distanciaTexto}.`;
+    }
+
+    if (obstacleAlert) {
+      obstacleAlert.hidden = false;
+    }
+
+    resetJoystick();
+    log(`Busqueda autonoma detenida sin ruta libre. Distancia: ${distanciaTexto}`);
+    touch();
+    return;
   }
+
+  if (lastEvent) {
+    lastEvent.textContent = data.estado === 'girando' ? 'Giro autonomo 90 grados' : 'Buscando ruta libre';
+  }
+
+  if (obstacleMessage) {
+    obstacleMessage.textContent = data.estado === 'girando'
+      ? `Obstaculo a ${distanciaTexto}. El carrito esta girando 90 grados para revisar otra direccion.`
+      : `Buscando una ruta libre. Distancia actual: ${distanciaTexto}.`;
+  }
+
+  if (obstacleAlert) {
+    obstacleAlert.hidden = false;
+  }
+  resetJoystick();
+  log(`${data.estado === 'girando' ? 'Giro autonomo' : 'Busqueda autonoma'}. Distancia: ${distanciaTexto}`);
+  touch();
 }
 
 function resetJoystick() {
   state.joystickActive = false;
   state.lastJoystickMove = null;
-  joystickKnob.style.transform = 'translate(-50%, -50%)';
 
-  if (!state.obstacleLocked) {
+  if (joystickKnob) {
+    joystickKnob.style.transform = 'translate(-50%, -50%)';
+  }
+
+  if (currentCommand) {
     currentCommand.textContent = 'Reposo';
   }
 }
@@ -582,7 +709,7 @@ function moveFromVector(x, y) {
 }
 
 function updateJoystick(clientX, clientY) {
-  if (state.obstacleLocked) {
+  if (!joystick || !joystickKnob) {
     return;
   }
 
@@ -606,11 +733,16 @@ function updateJoystick(clientX, clientY) {
   const moveKey = moveFromVector(dx / knobLimit, dy / knobLimit);
 
   if (!moveKey) {
-    currentCommand.textContent = 'Reposo';
+    if (currentCommand) {
+      currentCommand.textContent = 'Reposo';
+    }
+
     return;
   }
 
-  currentCommand.textContent = MOVEMENT_LABELS[moveKey];
+  if (currentCommand) {
+    currentCommand.textContent = MOVEMENT_LABELS[moveKey];
+  }
 
   if (moveKey !== state.lastJoystickMove) {
     state.lastJoystickMove = moveKey;
@@ -618,22 +750,19 @@ function updateJoystick(clientX, clientY) {
   }
 }
 
-joystick.addEventListener('pointerdown', (event) => {
-  if (state.obstacleLocked) {
-    log('Joystick bloqueado. Recalibra la ruta para continuar.');
-    return;
-  }
-
-  state.joystickActive = true;
-  joystick.setPointerCapture(event.pointerId);
-  updateJoystick(event.clientX, event.clientY);
-});
-
-joystick.addEventListener('pointermove', (event) => {
-  if (state.joystickActive) {
+if (joystick) {
+  joystick.addEventListener('pointerdown', (event) => {
+    state.joystickActive = true;
+    joystick.setPointerCapture(event.pointerId);
     updateJoystick(event.clientX, event.clientY);
-  }
-});
+  });
+
+  joystick.addEventListener('pointermove', (event) => {
+    if (state.joystickActive) {
+      updateJoystick(event.clientX, event.clientY);
+    }
+  });
+}
 
 function endJoystick() {
   if (!state.joystickActive) {
@@ -644,13 +773,37 @@ function endJoystick() {
   sendMovement('alto');
 }
 
-joystick.addEventListener('pointerup', endJoystick);
-joystick.addEventListener('pointercancel', endJoystick);
-joystick.addEventListener('lostpointercapture', endJoystick);
+if (joystick) {
+  joystick.addEventListener('pointerup', endJoystick);
+  joystick.addEventListener('pointercancel', endJoystick);
+  joystick.addEventListener('lostpointercapture', endJoystick);
+}
 
 document.querySelectorAll('[data-move]').forEach((button) => {
   button.addEventListener('click', () => {
-    sendMovement(button.dataset.move);
+    const moveKey = button.dataset.move;
+    if (currentCommand) {
+      currentCommand.textContent = MOVEMENT_LABELS[moveKey] || moveKey;
+    }
+    sendMovement(moveKey);
+  });
+});
+
+document.querySelectorAll('[data-control-mode]').forEach((button) => {
+  button.addEventListener('click', () => {
+    state.controlMode = button.dataset.controlMode;
+    resetJoystick();
+
+    document.querySelectorAll('[data-control-mode]').forEach((item) => {
+      const active = item === button;
+      item.classList.toggle('active', active);
+      item.setAttribute('aria-selected', String(active));
+    });
+
+    joystickControl.hidden = state.controlMode !== 'joystick';
+    dpadControl.hidden = state.controlMode !== 'dpad';
+    joystickSpinGrid.hidden = state.controlMode !== 'joystick';
+    log(`Modo de control: ${state.controlMode === 'joystick' ? 'joystick' : 'cruceta'}`);
   });
 });
 
@@ -663,32 +816,34 @@ document.querySelectorAll('[data-speed]').forEach((button) => {
   });
 });
 
-document.querySelector('#stopButton').addEventListener('click', () => {
+document.querySelector('#stopButton')?.addEventListener('click', () => {
   sendMovement('alto', { force: true });
   resetJoystick();
 });
 
-document.querySelector('#refreshButton').addEventListener('click', () => {
+document.querySelector('#refreshButton')?.addEventListener('click', () => {
   requestLastMovement();
   refreshStatus();
   log('Consulta manual de estatus');
 });
 
-document.querySelector('#clearLogButton').addEventListener('click', () => {
+document.querySelector('#clearLogButton')?.addEventListener('click', () => {
   logBox.innerHTML = '';
 });
 
-document.querySelector('#recalibrateButton').addEventListener('click', recalibrateRoute);
-document.querySelector('#addDemoMoveButton').addEventListener('click', () => {
+document.querySelector('#addDemoMoveButton')?.addEventListener('click', () => {
   state.demoSequence.push(demoMoveSelect.value);
   renderDemoSequence();
 });
-document.querySelector('#saveDemoButton').addEventListener('click', saveDemo);
-repeatDemoButton.addEventListener('click', repeatSelectedDemo);
+document.querySelector('#saveDemoButton')?.addEventListener('click', saveDemo);
+executeDemoButton?.addEventListener('click', () => runSelectedDemo('ejecutar'));
+repeatDemoButton?.addEventListener('click', () => runSelectedDemo('repetir'));
+deleteDemoButton?.addEventListener('click', deleteSelectedDemo);
 
-paramsForm.addEventListener('submit', saveParams);
+paramsForm?.addEventListener('submit', saveParams);
 
 setPill(apiStatus, 'API lista', 'warn');
+
 renderDemoSequence();
 connectWebSocket();
 refreshStatus();
