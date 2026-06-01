@@ -932,3 +932,26 @@ h3 {
     grid-column: auto;
   }
 }
+.site-footer {
+  padding: 1.25rem 2rem;
+  border-top: 1px solid rgba(16, 5, 95, 0.718);
+  margin-top: auto;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  opacity: 0.45;
+}
+
+.footer-brand {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.footer-divider {
+  opacity: 0.5;
+}
