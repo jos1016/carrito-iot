@@ -37,7 +37,7 @@ void conectarWiFi();
 void verificarWiFi();
 void detenerMotores();
 void procesarMovimiento(String json);
-void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo);
+void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, unsigned long tiempoMs);
 void webSocketEvent(WStype_t type, uint8_t* payload, size_t length);
 float medirDistancia();
 bool verificarObstaculo();
@@ -366,7 +366,21 @@ void procesarMovimiento(String json)
   int md_velocidad = movimiento["md_velocidad"] | 0;
   String mi_direccion = movimiento["mi_direccion"] | "STOP";
   String md_direccion = movimiento["md_direccion"] | "STOP";
-  int tiempo = movimiento["mi_time"] | 0;
+  String movimientoClave = movimiento["movimiento_clave"] | "";
+  String controlMode = movimiento["control_mode"] | "";
+  float tiempoSegundos = movimiento["mi_time"] | 0.0;
+  unsigned long tiempoMs = (unsigned long)(tiempoSegundos * 1000.0);
+
+  bool giroExacto =
+    movimientoClave == "GIRO_90_IZQ" ||
+    movimientoClave == "GIRO_90_DER" ||
+    movimientoClave == "GIRO_360_IZQ" ||
+    movimientoClave == "GIRO_360_DER";
+
+  if (controlMode == "joystick" && !giroExacto)
+  {
+    tiempoMs = 0;
+  }
 
   int inputIA = 0;
   int inputIB = 0;
@@ -391,10 +405,16 @@ void procesarMovimiento(String json)
     inputDB = md_velocidad;
   }
 
-  moverCarro(inputIA, inputIB, inputDA, inputDB, tiempo);
+  Serial.print("Movimiento: ");
+  Serial.print(movimientoClave);
+  Serial.print(" | Duracion: ");
+  Serial.print(tiempoMs);
+  Serial.println(" ms");
+
+  moverCarro(inputIA, inputIB, inputDA, inputDB, tiempoMs);
 }
 
-void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo)
+void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, unsigned long tiempoMs)
 {
   detenerMotores();
   delay(50);
@@ -409,14 +429,14 @@ void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo)
   analogWrite(IN_3, inputDA);
   analogWrite(IN_4, inputDB);
 
-  if (tiempo <= 0)
+  if (tiempoMs == 0)
   {
     return;
   }
 
   unsigned long inicio = millis();
 
-  while (millis() - inicio < tiempo)
+  while (millis() - inicio < tiempoMs)
   {
     if (WiFi.status() == WL_CONNECTED)
     {
