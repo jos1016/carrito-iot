@@ -2,6 +2,8 @@ import json
 import time
 
 from config.database import Database
+from models.movimiento_model import MovimientoModel
+from websocket.websocket_server import WebSocketServer
 
 
 class DemoModel:
@@ -157,6 +159,18 @@ class DemoModel:
         conexion.commit()
         cursor.close()
         conexion.close()
+
+        movimiento = MovimientoModel.ultimo_movimiento(
+            id_dispositivo,
+            1
+        )
+
+        WebSocketServer.broadcast(
+            json.dumps(
+                movimiento,
+                default=str
+            )
+        )
 
     @staticmethod
     def eliminar_demo(id_demo):

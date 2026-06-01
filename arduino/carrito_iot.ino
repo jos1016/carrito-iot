@@ -13,7 +13,7 @@
 const char* ssid = "JoshSH";
 const char* password = "bichongo";
 
-const char* websocket_host = "192.168.101.119";
+const char* websocket_host = "10.205.63.78";
 const int websocket_port = 5001;
 
 WebSocketsClient webSocket;
@@ -22,22 +22,29 @@ String ultimaFecha = "";
 
 bool websocketConectado = false;
 bool modoAutonomo = false;
+bool motoresActivos = false;
 
 unsigned long ultimoIntentoWiFi = 0;
 unsigned long ultimoEnvioObstaculo = 0;
 unsigned long ultimoEnvioDistancia = 0;
+unsigned long ultimaMedicionSensor = 0;
+unsigned long inicioMovimiento = 0;
+unsigned long duracionMovimiento = 0;
 
 const float DISTANCIA_OBSTACULO_CM = 15.0;
 const unsigned long TIEMPO_ENTRE_OBSTACULOS = 3000;
 const unsigned long INTERVALO_ENVIO_DISTANCIA = 300;
+const unsigned long INTERVALO_MEDICION_SENSOR = 80;
+const unsigned long INTERVALO_SOLICITUD_MOVIMIENTO = 1000;
 const unsigned long TIEMPO_GIRO_90_MS = 550;
 const int MAX_GIROS_BUSQUEDA = 4;
 
 void conectarWiFi();
 void verificarWiFi();
 void detenerMotores();
+void actualizarMotores();
 void procesarMovimiento(String json);
-void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo);
+void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, unsigned long tiempo);
 void webSocketEvent(WStype_t type, uint8_t* payload, size_t length);
 float medirDistancia();
 bool verificarObstaculo();
@@ -77,11 +84,12 @@ void loop()
     webSocket.loop();
   }
 
+  actualizarMotores();
   verificarObstaculo();
 
   static unsigned long lastTime = 0;
 
-  if (millis() - lastTime > 3000)
+  if (millis() - lastTime > INTERVALO_SOLICITUD_MOVIMIENTO)
   {
     lastTime = millis();
 
@@ -177,10 +185,18 @@ bool verificarObstaculo()
     return false;
   }
 
+  if (millis() - ultimaMedicionSensor < INTERVALO_MEDICION_SENSOR)
+  {
+    return false;
+  }
+
+  ultimaMedicionSensor = millis();
+
   float distancia = medirDistancia();
 
   if (distancia <= 0)
   {
+    Serial.println("Sensor HC-SR04 sin lectura valida");
     return false;
   }
 
@@ -220,6 +236,10 @@ void enviarDistancia(float distancia)
   String mensaje;
   serializeJson(doc, mensaje);
   webSocket.sendTXT(mensaje);
+
+  Serial.print("Telemetria enviada: ");
+  Serial.print(distancia);
+  Serial.println(" cm");
 }
 
 void registrarObstaculo(float distancia)
@@ -366,7 +386,14 @@ void procesarMovimiento(String json)
   int md_velocidad = movimiento["md_velocidad"] | 0;
   String mi_direccion = movimiento["mi_direccion"] | "STOP";
   String md_direccion = movimiento["md_direccion"] | "STOP";
-  int tiempo = movimiento["mi_time"] | 0;
+  float tiempoSegundos = movimiento["mi_time"] | 0.0;
+  String modoControl = movimiento["control_mode"] | "";
+  unsigned long tiempo = (unsigned long)(tiempoSegundos * 1000.0);
+
+  if (modoControl == "joystick")
+  {
+    tiempo = 0;
+  }
 
   int inputIA = 0;
   int inputIB = 0;
@@ -394,7 +421,7 @@ void procesarMovimiento(String json)
   moverCarro(inputIA, inputIB, inputDA, inputDB, tiempo);
 }
 
-void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo)
+void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, unsigned long tiempo)
 {
   detenerMotores();
   delay(50);
@@ -409,30 +436,30 @@ void moverCarro(int inputIA, int inputIB, int inputDA, int inputDB, int tiempo)
   analogWrite(IN_3, inputDA);
   analogWrite(IN_4, inputDB);
 
-  if (tiempo <= 0)
+  if (tiempo == 0)
+  {
+    motoresActivos = true;
+    duracionMovimiento = 0;
+    return;
+  }
+
+  motoresActivos = true;
+  inicioMovimiento = millis();
+  duracionMovimiento = tiempo;
+}
+
+void actualizarMotores()
+{
+  if (!motoresActivos || duracionMovimiento == 0)
   {
     return;
   }
 
-  unsigned long inicio = millis();
-
-  while (millis() - inicio < tiempo)
+  if (millis() - inicioMovimiento >= duracionMovimiento)
   {
-    if (WiFi.status() == WL_CONNECTED)
-    {
-      webSocket.loop();
-    }
-
-    if (verificarObstaculo())
-    {
-      return;
-    }
-
-    yield();
-    delay(50);
+    detenerMotores();
+    Serial.println("Movimiento finalizado por tiempo");
   }
-
-  detenerMotores();
 }
 
 void detenerMotores()
@@ -441,4 +468,7 @@ void detenerMotores()
   analogWrite(IN_2, 0);
   analogWrite(IN_3, 0);
   analogWrite(IN_4, 0);
+
+  motoresActivos = false;
+  duracionMovimiento = 0;
 }

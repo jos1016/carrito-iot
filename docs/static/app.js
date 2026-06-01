@@ -49,6 +49,7 @@ const state = {
   controlMode: 'joystick',
   joystickActive: false,
   lastJoystickMove: null,
+  dpadStopTimer: null,
   lastDistance: null,
   demoSequence: [],
   selectedDemoId: null
@@ -74,6 +75,7 @@ const obstacleMessage = document.querySelector('#obstacleMessage');
 const statusHistory = document.querySelector('#statusHistory');
 const obstacleHistory = document.querySelector('#obstacleHistory');
 const speedInput = document.querySelector('#speedInput');
+const factorTimeInput = document.querySelector('#factorTimeInput');
 const demoMoveSelect = document.querySelector('#demoMoveSelect');
 const demoSequence = document.querySelector('#demoSequence');
 const demosList = document.querySelector('#demosList');
@@ -129,6 +131,27 @@ function formatDate(value) {
   return new Date(value).toLocaleTimeString();
 }
 
+function cancelDpadStop() {
+  if (!state.dpadStopTimer) {
+    return;
+  }
+
+  clearTimeout(state.dpadStopTimer);
+  state.dpadStopTimer = null;
+}
+
+function scheduleDpadStop() {
+  const seconds = Math.max(0.1, Number(factorTimeInput?.value || 1));
+
+  cancelDpadStop();
+
+  state.dpadStopTimer = setTimeout(() => {
+    state.dpadStopTimer = null;
+    sendMovement('alto', { silent: true });
+    log(`Cruceta detenida despues de ${seconds} segundo(s).`);
+  }, seconds * 1000);
+}
+
 async function sendMovement(moveKey, options = {}) {
   const idMovimiento = MOVIMIENTOS[moveKey];
 
@@ -140,7 +163,8 @@ async function sendMovement(moveKey, options = {}) {
   const payload = {
     id_dispositivo: 1,
     id_movimiento: idMovimiento,
-    origen: options.origen || 'API'
+    origen: options.origen || 'API',
+    control_mode: options.controlMode || state.controlMode
   };
 
   try {
@@ -214,6 +238,7 @@ async function saveParams(event) {
 
     setPill(apiStatus, 'API conectada', 'ok');
     log(`Velocidad actualizada: ${payload.velocidad}`);
+    window.localStorage.setItem('carritoFactorTiempo', String(payload.factor_tiempo));
     touch();
   } catch (error) {
     setPill(apiStatus, 'API con error', 'bad');
@@ -752,6 +777,8 @@ function updateJoystick(clientX, clientY) {
 
 if (joystick) {
   joystick.addEventListener('pointerdown', (event) => {
+    cancelDpadStop();
+
     state.joystickActive = true;
     joystick.setPointerCapture(event.pointerId);
     updateJoystick(event.clientX, event.clientY);
@@ -782,10 +809,20 @@ if (joystick) {
 document.querySelectorAll('[data-move]').forEach((button) => {
   button.addEventListener('click', () => {
     const moveKey = button.dataset.move;
+
+    if (moveKey === 'alto') {
+      cancelDpadStop();
+    }
+
     if (currentCommand) {
       currentCommand.textContent = MOVEMENT_LABELS[moveKey] || moveKey;
     }
-    sendMovement(moveKey);
+
+    sendMovement(moveKey).then((sent) => {
+      if (sent && moveKey !== 'alto' && button.closest('#dpadControl')) {
+        scheduleDpadStop();
+      }
+    });
   });
 });
 
@@ -817,6 +854,7 @@ document.querySelectorAll('[data-speed]').forEach((button) => {
 });
 
 document.querySelector('#stopButton')?.addEventListener('click', () => {
+  cancelDpadStop();
   sendMovement('alto', { force: true });
   resetJoystick();
 });
@@ -843,6 +881,10 @@ deleteDemoButton?.addEventListener('click', deleteSelectedDemo);
 paramsForm?.addEventListener('submit', saveParams);
 
 setPill(apiStatus, 'API lista', 'warn');
+
+if (factorTimeInput) {
+  factorTimeInput.value = window.localStorage.getItem('carritoFactorTiempo') || factorTimeInput.value;
+}
 
 renderDemoSequence();
 connectWebSocket();

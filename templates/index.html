@@ -101,6 +101,34 @@
         </div>
       </article>
 
+      <article class="panel radar-panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Sensor ultrasonico</p>
+            <h2>Radar HC-SR04</h2>
+          </div>
+        </div>
+
+        <div class="radar-card radar-card-control">
+          <div class="radar" id="radar" aria-label="Radar ultrasonico">
+            <div class="radar-ring ring-1"></div>
+            <div class="radar-ring ring-2"></div>
+            <div class="radar-ring ring-3"></div>
+            <div class="radar-axis horizontal"></div>
+            <div class="radar-axis vertical"></div>
+            <div class="radar-sweep"></div>
+            <div class="radar-blip" id="radarBlip" hidden></div>
+            <div class="radar-origin"></div>
+          </div>
+          <div class="radar-copy">
+            <p class="eyebrow">Distancia frontal</p>
+            <strong id="radarDistance">-- cm</strong>
+            <span id="radarState">Esperando telemetria</span>
+            <small>Frenado automatico: 15 cm</small>
+          </div>
+        </div>
+      </article>
+
       <article class="panel tools-panel">
         <div class="panel-header">
           <div>
@@ -130,8 +158,8 @@
             <input name="factor_vuelta" type="number" value="1" step="0.01">
           </label>
           <label>
-            Factor tiempo
-            <input name="factor_tiempo" type="number" value="1" step="0.01">
+            Factor tiempo (segundos)
+            <input name="factor_tiempo" id="factorTimeInput" type="number" value="1" min="0.1" step="0.1">
           </label>
           <label>
             Factor giro 90

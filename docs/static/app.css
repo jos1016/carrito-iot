@@ -212,6 +212,10 @@ h3 {
   grid-template-rows: auto;
 }
 
+.monitoring-dashboard .status-panel {
+  grid-column: span 2;
+}
+
 .log-panel {
   grid-column: span 2;
 }
@@ -532,6 +536,10 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f2fbf9;
+}
+
+.radar-card-control {
+  min-height: 126px;
 }
 
 .radar {
@@ -917,6 +925,10 @@ h3 {
   }
 
   .log-panel {
+    grid-column: auto;
+  }
+
+  .monitoring-dashboard .status-panel {
     grid-column: auto;
   }
 }

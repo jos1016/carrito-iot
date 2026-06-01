@@ -67,8 +67,11 @@ def repetir_demo(id_demo):
 
 
 if __name__ == '__main__':
+    websocket_socket = WebSocketServer.crear_socket_servidor()
+
     websocket_thread = Thread(
         target=WebSocketServer.start,
+        args=(websocket_socket,),
         daemon=True
     )
     websocket_thread.start()

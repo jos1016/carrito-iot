@@ -122,6 +122,26 @@ class WebSocketServer:
         return frame
 
     @staticmethod
+    def crear_socket_servidor():
+
+        servidor = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM
+        )
+
+        if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
+            servidor.setsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_EXCLUSIVEADDRUSE,
+                1
+            )
+
+        servidor.bind(('0.0.0.0', 5001))
+        servidor.listen(5)
+
+        return servidor
+
+    @staticmethod
     def handle_client(cliente):
 
         try:
@@ -240,22 +260,10 @@ class WebSocketServer:
             cliente.close()
 
     @staticmethod
-    def start():
+    def start(servidor=None):
 
-        servidor = socket.socket(
-            socket.AF_INET,
-            socket.SOCK_STREAM
-        )
-
-        servidor.setsockopt(
-            socket.SOL_SOCKET,
-            socket.SO_REUSEADDR,
-            1
-        )
-
-        servidor.bind(('0.0.0.0', 5001))
-
-        servidor.listen(5)
+        if servidor is None:
+            servidor = WebSocketServer.crear_socket_servidor()
 
         print("WebSocket activo en puerto 5001")
 
