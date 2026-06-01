@@ -4,10 +4,10 @@ const WS_URL = `ws://${window.location.hostname}:5001/`;
 const MOVIMIENTOS = {
   adelante: 1,
   atras: 2,
-  vuelta_adelante_derecha: 3,
-  vuelta_adelante_izquierda: 4,
-  vuelta_atras_derecha: 5,
-  vuelta_atras_izquierda: 6,
+  vuelta_adelante_derecha: 4,
+  vuelta_adelante_izquierda: 3,
+  vuelta_atras_derecha: 6,
+  vuelta_atras_izquierda: 5,
   giro_90_izquierda: 8,
   giro_90_derecha: 7,
   giro_360_izquierda: 10,
@@ -76,6 +76,7 @@ const statusHistory = document.querySelector('#statusHistory');
 const obstacleHistory = document.querySelector('#obstacleHistory');
 const speedInput = document.querySelector('#speedInput');
 const factorTimeInput = document.querySelector('#factorTimeInput');
+const factorTurn90Input = document.querySelector('[name="factor_giro90"]');
 const demoMoveSelect = document.querySelector('#demoMoveSelect');
 const demoSequence = document.querySelector('#demoSequence');
 const demosList = document.querySelector('#demosList');
@@ -140,15 +141,30 @@ function cancelDpadStop() {
   state.dpadStopTimer = null;
 }
 
-function scheduleDpadStop() {
-  const seconds = Math.max(0.1, Number(factorTimeInput?.value || 1));
+function getMovementDuration(moveKey) {
+  const factorTime = Math.max(0.1, Number(factorTimeInput?.value || 1));
+  const factorTurn90 = Math.max(0.01, Number(factorTurn90Input?.value || 1));
+
+  if (moveKey.startsWith('giro_360_')) {
+    return factorTime * factorTurn90 * 4;
+  }
+
+  if (moveKey.startsWith('giro_90_')) {
+    return factorTime * factorTurn90;
+  }
+
+  return factorTime;
+}
+
+function scheduleDpadStop(moveKey) {
+  const seconds = getMovementDuration(moveKey);
 
   cancelDpadStop();
 
   state.dpadStopTimer = setTimeout(() => {
     state.dpadStopTimer = null;
     sendMovement('alto', { silent: true });
-    log(`Cruceta detenida despues de ${seconds} segundo(s).`);
+    log(`Movimiento detenido despues de ${seconds} segundo(s).`);
   }, seconds * 1000);
 }
 
@@ -819,8 +835,12 @@ document.querySelectorAll('[data-move]').forEach((button) => {
     }
 
     sendMovement(moveKey).then((sent) => {
-      if (sent && moveKey !== 'alto' && button.closest('#dpadControl')) {
-        scheduleDpadStop();
+      const isExactTurn =
+        moveKey.startsWith('giro_90_') ||
+        moveKey.startsWith('giro_360_');
+
+      if (sent && moveKey !== 'alto' && (button.closest('#dpadControl') || isExactTurn)) {
+        scheduleDpadStop(moveKey);
       }
     });
   });
